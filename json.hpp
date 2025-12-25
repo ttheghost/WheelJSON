@@ -4,6 +4,7 @@
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <stdexcept>
 
 namespace WheelJSON {
 struct JsonValue;
@@ -44,4 +45,49 @@ struct JsonValue {
     return std::get<std::map<std::string, JsonValue>>(value);
   }
 };
+
+JsonValue parse(std::string_view json) {
+    JsonParser parser(json);
+    return parser.parse_value();
+}
+
+class JsonParser {
+    friend JsonValue parse(std::string_view json);
+private:
+    std::string_view src_;
+    size_t pos_;
+    JsonParser(std::string_view src): src_(src), pos_(0) {}
+
+    void skip_whitspace() {
+        while (pos_ < src_.size() && std::isspace(src_[pos_]))
+            pos_++;
+    }
+
+    char peek() {
+        skip_whitspace();
+        if (pos_ >= src_.size()) return 0;
+        return src_[pos_];
+    }
+
+    bool consume(char expected) {
+        skip_whitspace();
+        if (pos_ < src_.size() && src_[pos_] == expected)
+        {
+            pos_++;
+            return true;
+        }
+        return false;
+    }
+
+    void expect(char expected) {
+        if (!consume(expected))
+            throw std::runtime_error(std::string("Expected '") + expected + "' at position " + std::to_string(pos_));
+    }
+
+    JsonValue parse_value() {
+        char c = peek();
+        return JsonValue{};
+    }
+};
+
 }; // namespace WheelJSON
