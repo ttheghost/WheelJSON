@@ -1,6 +1,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -204,19 +205,23 @@ private:
             uint32_t codepoint = parse_hex4();
 
             if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
-                if (pos_ + 2 < src_.size() && src_[pos_] == '\\' && src_[pos_ + 1] == 'u') {
-                    pos_ += 2;
-                    uint32_t low = parse_hex4();
-                    if (low >= 0xDC00 && low <= 0xDFFF) {
-                        codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
-                    } else {
-                        throw std::runtime_error("Invalid low surrogate in \\u sequence");
-                    }
+              if (pos_ + 2 < src_.size() && src_[pos_] == '\\' &&
+                  src_[pos_ + 1] == 'u') {
+                pos_ += 2;
+                uint32_t low = parse_hex4();
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                  codepoint =
+                      0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
                 } else {
-                    throw std::runtime_error("Lone high surrogate in \\u sequence");
+                  throw std::runtime_error(
+                      "Invalid low surrogate in \\u sequence");
                 }
-            }else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
-                throw std::runtime_error("Unexpected low surrogate in \\u sequence");
+              } else {
+                throw std::runtime_error("Lone high surrogate in \\u sequence");
+              }
+            } else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+              throw std::runtime_error(
+                  "Unexpected low surrogate in \\u sequence");
             }
 
             encode_utf8(str, codepoint);
