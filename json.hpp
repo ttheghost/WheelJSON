@@ -200,7 +200,28 @@ private:
           case 't':
             str += '\t';
             break;
-          // TODO: Add uXXXX
+          case 'u': {
+            uint32_t codepoint = parse_hex4();
+
+            if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+                if (pos_ + 2 < src_.size() && src_[pos_] == '\\' && src_[pos_ + 1] == 'u') {
+                    pos_ += 2;
+                    uint32_t low = parse_hex4();
+                    if (low >= 0xDC00 && low <= 0xDFFF) {
+                        codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+                    } else {
+                        throw std::runtime_error("Invalid low surrogate in \\u sequence");
+                    }
+                } else {
+                    throw std::runtime_error("Lone high surrogate in \\u sequence");
+                }
+            }else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+                throw std::runtime_error("Unexpected low surrogate in \\u sequence");
+            }
+
+            encode_utf8(str, codepoint);
+            break;
+          }
           default:
             str += escape;
             break;
@@ -245,6 +266,45 @@ private:
       pos_++;
     }
     return value;
+  }
+
+  uint16_t parse_hex4() {
+    uint16_t val = 0;
+    for (int i = 0; i < 4; ++i) {
+      if (pos_ >= src_.size())
+        throw std::runtime_error("Unexpected end of input in \\u sequence");
+
+      char c = src_[pos_++];
+      val <<= 4;
+
+      if (c >= '0' && c <= '9')
+        val |= (c - '0');
+      else if (c >= 'a' && c <= 'f')
+        val |= (c - 'a' + 10);
+      else if (c >= 'A' && c <= 'F')
+        val |= (c - 'A' + 10);
+      else
+        throw std::runtime_error("Invalid hex digit in \\u sequence");
+    }
+    return val;
+  }
+
+  void encode_utf8(std::string &out, uint32_t codepoint) {
+    if (codepoint <= 0x7F) {
+      out += static_cast<char>(codepoint);
+    } else if (codepoint <= 0x7FF) {
+      out += static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F));
+      out += static_cast<char>(0x80 | (codepoint & 0x3F));
+    } else if (codepoint <= 0xFFFF) {
+      out += static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F));
+      out += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (codepoint & 0x3F));
+    } else {
+      out += static_cast<char>(0xF0 | ((codepoint >> 18) & 0x07));
+      out += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+      out += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+      out += static_cast<char>(0x80 | (codepoint & 0x3F));
+    }
   }
 };
 
