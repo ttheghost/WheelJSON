@@ -1,7 +1,6 @@
 #include <cctype>
 #include <charconv>
 #include <cstddef>
-#include <iterator>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -23,13 +22,16 @@ struct JsonValue {
   JsonValue() : value(std::monostate{}) {}
   JsonValue(bool b) : value(b) {}
   JsonValue(double d) : value(d) {}
-  JsonValue(std::string s) : value(s) {}
+  JsonValue(const std::string &s) : value(s) {}
   JsonValue(const char *s) : value(std::string(s)) {}
-  JsonValue(std::vector<JsonValue> v) : value(v) {}
-  JsonValue(std::map<std::string, JsonValue> m) : value(m) {}
+  JsonValue(const std::vector<JsonValue> &v) : value(v) {}
+  JsonValue(const std::map<std::string, JsonValue> &m) : value(m) {}
 
-  JsonValue(JsonValue&&) = default;
-  JsonValue& operator=(JsonValue&&) = default;
+  JsonValue(const JsonValue &) = default;
+  JsonValue &operator=(const JsonValue &) = default;
+
+  JsonValue(JsonValue &&) = default;
+  JsonValue &operator=(JsonValue &&) = default;
 
   bool is_null() const { return std::holds_alternative<std::monostate>(value); }
   bool is_bool() const { return std::holds_alternative<bool>(value); }
@@ -54,6 +56,7 @@ struct JsonValue {
 };
 
 class JsonParser {
+public:
   static JsonValue parse(std::string_view json) {
     JsonParser parser(json);
     return parser.start_parse();
@@ -116,9 +119,9 @@ private:
     case '-':
       return parse_number();
     case 't':
-        return parse_literal("true", true);
+      return parse_literal("true", true);
     case 'f':
-        return parse_literal("false", false);
+      return parse_literal("false", false);
     case 'n':
       return parse_literal("null", JsonValue{});
     }
@@ -234,8 +237,7 @@ private:
     return val;
   }
 
-  template<typename T>
-  T parse_literal(std::string expected, T value) {
+  template <typename T> T parse_literal(std::string expected, T value) {
     for (char c : expected) {
       if (pos_ >= src_.size() || src_[pos_] != c) {
         throw std::runtime_error("Invalid literal");
